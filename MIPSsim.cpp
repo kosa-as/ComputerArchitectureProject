@@ -715,7 +715,7 @@ int MIPSsim::_break(Instruction& inst, int pc) {
 int main(int argc, char* argv[]){
     MIPSsim mips;
     if(argc != 2){
-        std::throw_with_nested("参数错误");
+        throw std::invalid_argument("usage: ./MIPSsim <input_file>");
     }
     mips.set_input_filename(argv[1]);
     mips.set_output_filename("mydisassembly.txt");
