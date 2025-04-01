@@ -712,9 +712,12 @@ int MIPSsim::_break(Instruction& inst, int pc) {
     return pc+1;
 }
 
-int main(){
+int main(int argc, char* argv[]){
     MIPSsim mips;
-    mips.set_input_filename("sample.txt");
+    if(argc != 2){
+        std::throw_with_nested("参数错误");
+    }
+    mips.set_input_filename(argv[1]);
     mips.set_output_filename("mydisassembly.txt");
     mips.set_simulation_filename("mysimulation.txt");
     mips.read_from_file();
