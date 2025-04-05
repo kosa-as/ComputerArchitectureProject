@@ -1,3 +1,5 @@
 build/
 .vscode/
 MIPSsim
+generated_disassembly.txt
+generated_simulation.txt
