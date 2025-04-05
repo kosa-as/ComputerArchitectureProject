@@ -609,7 +609,7 @@ int MIPSsim::_andi(Instruction& inst, int pc) {
         int rt = inst._rt.value();
         int rs = inst._rs.value();
         int immediate_value = inst._immediate_value.value();
-        registers[rt] = registers[rs] & immediate_value;
+        registers[rs] = registers[rt] & immediate_value;
         return pc+1;
     }else{
         std::throw_with_nested(std::runtime_error("寄存器错误"));
@@ -622,7 +622,7 @@ int MIPSsim::_ori(Instruction& inst, int pc) {
         int rt = inst._rt.value();
         int rs = inst._rs.value();
         int immediate_value = inst._immediate_value.value();
-        registers[rt] = registers[rs] | immediate_value;
+        registers[rs] = registers[rt] | immediate_value;
         return pc+1;
     }else{
         std::throw_with_nested(std::runtime_error("寄存器错误"));
@@ -635,7 +635,7 @@ int MIPSsim::_xori(Instruction& inst, int pc) {
         int rt = inst._rt.value();
         int rs = inst._rs.value();
         int immediate_value = inst._immediate_value.value();
-        registers[rt] = registers[rs] ^ immediate_value;
+        registers[rs] = registers[rt] ^ immediate_value;
         return pc+1;
     }else{
         std::throw_with_nested(std::runtime_error("寄存器错误"));
