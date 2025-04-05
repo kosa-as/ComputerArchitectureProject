@@ -12,7 +12,7 @@
 #include <functional>
 #include <iomanip>
 
-constexpr int base_address = 0x00000080;
+constexpr uint32_t base_address = 0x00000080;
 
 /*
     @param value: 寄存器编号
@@ -64,23 +64,23 @@ enum class InstructionType : unsigned int{
     @param _rd: 指令的目的寄存器(可选)
     @param _immediate_value: 指令的立即数(可选)
     @param _offset: 指令的偏移量(可选)
-    @param _value: 指令的值(可选)
+    @param _value: data部分的值(可选)
 */
 struct Instruction {
     uint32_t instruction;
     InstructionType type;
     std::string instruction_detail;
     std::string print_instruction_detail;
-    int address;
-    std::optional<int> _rs;
-    std::optional<int> _rt;
-    std::optional<int> _rd;
-    std::optional<int> _immediate_value;
-    std::optional<int> _offset;
+    uint32_t address;
+    std::optional<uint32_t> _rs;
+    std::optional<uint32_t> _rt;
+    std::optional<uint32_t> _rd;
+    std::optional<uint32_t> _immediate_value;
+    std::optional<uint32_t> _offset;
     std::optional<int> _value;
-    static std::unordered_map<int, std::string> category_1_map;
-    static std::unordered_map<int, std::string> category_2_map;
-    static std::unordered_map<int, std::string> category_3_map;
+    static std::unordered_map<unsigned int, std::string> category_1_map;
+    static std::unordered_map<unsigned int, std::string> category_2_map;
+    static std::unordered_map<unsigned int, std::string> category_3_map;
     void process_instruction();
     void process_category_1();
     void process_category_2();
@@ -90,7 +90,7 @@ struct Instruction {
 
 
 // 这里声明了函数指针的类型，用于存储指令的执行函数。std::function是C++11标准库中的一个模板类，用于存储和调用函数对象。
-using Func = std::function<int(Instruction&, int)>;
+using Func = std::function<uint32_t(Instruction&, uint32_t)>;
 
 /*
     @param instructions: 指令列表
@@ -110,25 +110,25 @@ class MIPSsim {
     std::string simulation_filename;
     std::array<int, 32> registers{};
     std::vector<int> data;
-    int base_data_address;
+    uint32_t base_data_address;
     Func select_instruction(Instruction& inst);
-    int _add(Instruction& inst, int pc);
-    int _sub(Instruction& inst, int pc);
-    int _mul(Instruction& inst, int pc);
-    int _and(Instruction& inst, int pc);
-    int _or(Instruction& inst, int pc);
-    int _xor(Instruction& inst, int pc);
-    int _nor(Instruction& inst, int pc);
-    int _addi(Instruction& inst, int pc);
-    int _andi(Instruction& inst, int pc);
-    int _ori(Instruction& inst, int pc);
-    int _xori(Instruction& inst, int pc);
-    int _j(Instruction& inst, int pc);
-    int _beq(Instruction& inst, int pc);
-    int _bgtz(Instruction& inst, int pc);
-    int _sw(Instruction& inst, int pc);
-    int _lw(Instruction& inst, int pc);
-    int _break(Instruction& inst, int pc);
+    uint32_t _add(Instruction& inst, uint32_t pc);
+    uint32_t _sub(Instruction& inst, uint32_t pc);
+    uint32_t _mul(Instruction& inst, uint32_t pc);
+    uint32_t _and(Instruction& inst, uint32_t pc);
+    uint32_t _or(Instruction& inst, uint32_t pc);
+    uint32_t _xor(Instruction& inst, uint32_t pc);
+    uint32_t _nor(Instruction& inst, uint32_t pc);
+    uint32_t _addi(Instruction& inst, uint32_t pc);
+    uint32_t _andi(Instruction& inst, uint32_t pc);
+    uint32_t _ori(Instruction& inst, uint32_t pc);
+    uint32_t _xori(Instruction& inst, uint32_t pc);
+    uint32_t _j(Instruction& inst, uint32_t pc);
+    uint32_t _beq(Instruction& inst, uint32_t pc);
+    uint32_t _bgtz(Instruction& inst, uint32_t pc);
+    uint32_t _sw(Instruction& inst, uint32_t pc);
+    uint32_t _lw(Instruction& inst, uint32_t pc);
+    uint32_t _break(Instruction& inst, uint32_t pc);
     void print_registers();
     void print_data();
     public:
@@ -328,7 +328,7 @@ void MIPSsim::excute() {
     // 在开始执行前清空文件
     std::ofstream clear_file(simulation_filename, std::ios::trunc);
     clear_file.close();
-    int pc = 0;
+    uint32_t pc = 0;
     int count = 1;
     // -1 是break指令的需求
     int length = instructions.size() - data.size();
@@ -339,7 +339,7 @@ void MIPSsim::excute() {
            pc+1;
            continue;
        }
-       int next_pc = func(instructions[pc], pc);
+       uint32_t next_pc = func(instructions[pc], pc);
 
        write_to_simulation_file(count, instructions[pc].instruction_detail);
     //    print_registers();
@@ -350,7 +350,7 @@ void MIPSsim::excute() {
     
 }
 
-std::unordered_map<int, std::string> Instruction::category_1_map = {
+std::unordered_map<unsigned int, std::string> Instruction::category_1_map = {
     {0b000, "J"},
     {0b010, "BEQ"},
     {0b100, "BGTZ"},
@@ -359,7 +359,7 @@ std::unordered_map<int, std::string> Instruction::category_1_map = {
     {0b111, "LW"}
 };
 
-std::unordered_map<int, std::string> Instruction::category_2_map = {
+std::unordered_map<unsigned int, std::string> Instruction::category_2_map = {
     {0b000, "ADD"},
     {0b001, "SUB"},
     {0b010, "MUL"},
@@ -369,7 +369,7 @@ std::unordered_map<int, std::string> Instruction::category_2_map = {
     {0b110, "NOR"},
 };
 
-std::unordered_map<int, std::string> Instruction::category_3_map = {
+std::unordered_map<unsigned int, std::string> Instruction::category_3_map = {
     {0b000, "ADDI"},
     {0b001, "ANDI"},
     {0b010, "ORI"},
@@ -382,7 +382,7 @@ bool MIPSsim::is_break = false;
 void Instruction::process_instruction() {
     // 获取前3位
     std::string prefix = std::bitset<32>(instruction).to_string() + "      ";
-    int category = (instruction >> 29) & 0x7;
+    uint32_t category = (instruction >> 29) & 0x7;
     switch(category) {
         case 0b000:
             process_category_1();
@@ -403,7 +403,7 @@ void Instruction::process_instruction() {
 }
 
 void Instruction::process_category_1() {
-    int opcode = (instruction >> 26) & 0x7;
+    uint32_t opcode = (instruction >> 26) & 0x7;
     if (Instruction::category_1_map.find(opcode) != Instruction::category_1_map.end()) {
         instruction_detail = Instruction::category_1_map[opcode];
     } else {
@@ -411,16 +411,18 @@ void Instruction::process_category_1() {
     }
     type = stringToInstruction(instruction_detail);
     if(type == InstructionType::J) {
+        //取延迟槽的指令的前四位
+        uint32_t high_bits = ((address+4) & 0xF0000000);
         //取出后面的26位，在左移2位，获得jump的地址
-        int immediate_value = (instruction & 0x3FFFFFF)<<2;
+        uint32_t immediate_value = high_bits | ((instruction & 0x3FFFFFF)<<2);
         _immediate_value = immediate_value;
         instruction_detail += " #" + std::to_string(immediate_value);
     }
     else if(type == InstructionType::BEQ) {
         //相等时分支，后16位左移2位，获得offset
-        int rs = (instruction >> 21) & 0x1F;
-        int rt = (instruction >> 16) & 0x1F;
-        int offset = (instruction & 0xFFFF) << 2;
+        uint32_t rs = (instruction >> 21) & 0x1F;
+        uint32_t rt = (instruction >> 16) & 0x1F;
+        uint32_t offset = (instruction & 0xFFFF) << 2;
         _rs = rs;
         _rt = rt;
         _offset = offset;
@@ -428,17 +430,17 @@ void Instruction::process_category_1() {
     }
     else if(type == InstructionType::BGTZ) {
         //大于0时分支，后16位左移2位，获得offset，同时没有Rt
-        int rs = (instruction >> 21) & 0x1F;
-        int offset = (instruction & 0xFFFF) << 2;
+        uint32_t rs = (instruction >> 21) & 0x1F;
+        uint32_t offset = (instruction & 0xFFFF) << 2;
         _rs = rs;
         _offset = offset;
         instruction_detail += " " + int_to_string_reg(rs) + ", #" + std::to_string(offset);
     }
     else if(type == InstructionType::SW) {
         //存储，后16位获得offset
-        int rs = (instruction >> 21) & 0x1F;
-        int rt = (instruction >> 16) & 0x1F;
-        int offset = (instruction & 0xFFFF);
+        uint32_t rs = (instruction >> 21) & 0x1F;
+        uint32_t rt = (instruction >> 16) & 0x1F;
+        uint32_t offset = (instruction & 0xFFFF);
         _rs = rs;
         _rt = rt;
         _offset = offset;
@@ -446,9 +448,9 @@ void Instruction::process_category_1() {
     }
     else if(type == InstructionType::LW) {
         //加载，后16位获得offset
-        int rs = (instruction >> 21) & 0x1F;
-        int rt = (instruction >> 16) & 0x1F;
-        int offset = (instruction & 0xFFFF);
+        uint32_t rs = (instruction >> 21) & 0x1F;
+        uint32_t rt = (instruction >> 16) & 0x1F;
+        uint32_t offset = (instruction & 0xFFFF);
         _rs = rs;
         _rt = rt;
         _offset = offset;
@@ -460,16 +462,16 @@ void Instruction::process_category_1() {
 
 }
 void Instruction::process_category_2() {
-    int opcode = (instruction >> 16) & 0x7;
+    uint32_t opcode = (instruction >> 16) & 0x7;
     if (Instruction::category_2_map.find(opcode) != Instruction::category_2_map.end()) {
         instruction_detail = Instruction::category_2_map[opcode];
     } else {
         instruction_detail = "UNKNOWN";
     }
     type = stringToInstruction(instruction_detail);
-    int rd = (instruction >> 11) & 0x1F;
-    int rs = (instruction >> 19) & 0x1F;
-    int rt = (instruction >> 24) & 0x1F;
+    uint32_t rd = (instruction >> 11) & 0x1F;
+    uint32_t rs = (instruction >> 19) & 0x1F;
+    uint32_t rt = (instruction >> 24) & 0x1F;
     _rd = rd;
     _rs = rs;
     _rt = rt;
@@ -485,9 +487,9 @@ void Instruction::process_category_3() {
         instruction_detail = "UNKNOWN";
     }
     type = stringToInstruction(instruction_detail);
-    int rs = (instruction >> 19) & 0x1F;
-    int rt = (instruction >> 24) & 0x1F;
-    int immediate_value = (instruction) & 0xFF;
+    uint32_t rs = (instruction >> 19) & 0x1F;
+    uint32_t rt = (instruction >> 24) & 0x1F;
+    uint32_t immediate_value = (instruction) & 0xFF;
     _rs = rs;
     _rt = rt;
     _immediate_value = immediate_value;
@@ -500,11 +502,11 @@ void Instruction::process_category_4() {
     print_instruction_detail = std::bitset<32>(instruction).to_string() + "      "+ instruction_detail;
 }
 
-int MIPSsim::_add(Instruction& inst, int pc) {
+uint32_t MIPSsim::_add(Instruction& inst, uint32_t pc) {
     if(inst._rd.has_value() && inst._rs.has_value() && inst._rt.has_value()) {
-        int rd = inst._rd.value();
-        int rs = inst._rs.value();
-        int rt = inst._rt.value();
+        uint32_t rd = inst._rd.value();
+        uint32_t rs = inst._rs.value();
+        uint32_t rt = inst._rt.value();
         registers[rd] = registers[rs] + registers[rt];
         return pc+1;
     }else{
@@ -513,11 +515,11 @@ int MIPSsim::_add(Instruction& inst, int pc) {
     return 0;
 }
 
-int MIPSsim::_sub(Instruction& inst, int pc) {
+uint32_t MIPSsim::_sub(Instruction& inst, uint32_t pc) {
     if(inst._rd.has_value() && inst._rs.has_value() && inst._rt.has_value()) {
-        int rd = inst._rd.value();
-        int rs = inst._rs.value();
-        int rt = inst._rt.value();
+        uint32_t rd = inst._rd.value();
+        uint32_t rs = inst._rs.value();
+        uint32_t rt = inst._rt.value();
         registers[rd] = registers[rs] - registers[rt];
         return pc+1;
     }else{
@@ -526,11 +528,11 @@ int MIPSsim::_sub(Instruction& inst, int pc) {
     return 0;
 }
 
-int MIPSsim::_mul(Instruction& inst, int pc) {
+uint32_t MIPSsim::_mul(Instruction& inst, uint32_t pc) {
     if(inst._rd.has_value() && inst._rs.has_value() && inst._rt.has_value()) {
-        int rd = inst._rd.value();
-        int rs = inst._rs.value();
-        int rt = inst._rt.value();
+        uint32_t rd = inst._rd.value();
+        uint32_t rs = inst._rs.value();
+        uint32_t rt = inst._rt.value();
         registers[rd] = registers[rs] * registers[rt];
         return pc+1;
     }else{
@@ -539,11 +541,11 @@ int MIPSsim::_mul(Instruction& inst, int pc) {
     return 0;
 }
 
-int MIPSsim::_and(Instruction& inst, int pc) {
+uint32_t MIPSsim::_and(Instruction& inst, uint32_t pc) {
     if(inst._rd.has_value() && inst._rs.has_value() && inst._rt.has_value()) {
-        int rd = inst._rd.value();
-        int rs = inst._rs.value();
-        int rt = inst._rt.value();
+        uint32_t rd = inst._rd.value();
+        uint32_t rs = inst._rs.value();
+        uint32_t rt = inst._rt.value();
         registers[rd] = registers[rs] & registers[rt];
         return pc+1;
     }else{
@@ -552,11 +554,11 @@ int MIPSsim::_and(Instruction& inst, int pc) {
     return 0;
 }
 
-int MIPSsim::_or(Instruction& inst, int pc) {
+uint32_t MIPSsim::_or(Instruction& inst, uint32_t pc) {
     if(inst._rd.has_value() && inst._rs.has_value() && inst._rt.has_value()) {
-        int rd = inst._rd.value();
-        int rs = inst._rs.value();
-        int rt = inst._rt.value();
+        uint32_t rd = inst._rd.value();
+        uint32_t rs = inst._rs.value();
+        uint32_t rt = inst._rt.value();
         registers[rd] = registers[rs] | registers[rt];
         return pc+1;
     }else{
@@ -565,11 +567,11 @@ int MIPSsim::_or(Instruction& inst, int pc) {
     return 0;
 }
 
-int MIPSsim::_xor(Instruction& inst, int pc) {
+uint32_t MIPSsim::_xor(Instruction& inst, uint32_t pc) {
     if(inst._rd.has_value() && inst._rs.has_value() && inst._rt.has_value()) {
-        int rd = inst._rd.value();
-        int rs = inst._rs.value();
-        int rt = inst._rt.value();
+        uint32_t rd = inst._rd.value();
+        uint32_t rs = inst._rs.value();
+        uint32_t rt = inst._rt.value();
         registers[rd] = registers[rs] ^ registers[rt];
         return pc+1;
     }else{
@@ -578,11 +580,11 @@ int MIPSsim::_xor(Instruction& inst, int pc) {
     return 0;
 }
 
-int MIPSsim::_nor(Instruction& inst, int pc) {
+uint32_t MIPSsim::_nor(Instruction& inst, uint32_t pc) {
     if(inst._rd.has_value() && inst._rs.has_value() && inst._rt.has_value()) {
-        int rd = inst._rd.value();
-        int rs = inst._rs.value();
-        int rt = inst._rt.value();
+        uint32_t rd = inst._rd.value();
+        uint32_t rs = inst._rs.value();
+        uint32_t rt = inst._rt.value();
         registers[rd] = ~(registers[rs] | registers[rt]);
         return pc+1;
     }else{
@@ -591,11 +593,11 @@ int MIPSsim::_nor(Instruction& inst, int pc) {
     return 0;
 }
 
-int MIPSsim::_addi(Instruction& inst, int pc) {
+uint32_t MIPSsim::_addi(Instruction& inst, uint32_t pc) {
     if(inst._rt.has_value() && inst._rs.has_value() && inst._immediate_value.has_value()) {
-        int rt = inst._rt.value();
-        int rs = inst._rs.value();
-        int immediate_value = inst._immediate_value.value();
+        uint32_t rt = inst._rt.value();
+        uint32_t rs = inst._rs.value();
+        uint32_t immediate_value = inst._immediate_value.value();
         registers[rs] = registers[rt] + immediate_value;
         return pc+1;
     }else{
@@ -604,11 +606,11 @@ int MIPSsim::_addi(Instruction& inst, int pc) {
     return 0;
 }
 
-int MIPSsim::_andi(Instruction& inst, int pc) {
+uint32_t MIPSsim::_andi(Instruction& inst, uint32_t pc) {
     if(inst._rt.has_value() && inst._rs.has_value() && inst._immediate_value.has_value()) {
-        int rt = inst._rt.value();
-        int rs = inst._rs.value();
-        int immediate_value = inst._immediate_value.value();
+        uint32_t rt = inst._rt.value();
+        uint32_t rs = inst._rs.value();
+        uint32_t immediate_value = inst._immediate_value.value();
         registers[rs] = registers[rt] & immediate_value;
         return pc+1;
     }else{
@@ -617,11 +619,11 @@ int MIPSsim::_andi(Instruction& inst, int pc) {
     return 0;
 }
 
-int MIPSsim::_ori(Instruction& inst, int pc) {
+uint32_t MIPSsim::_ori(Instruction& inst, uint32_t pc) {
     if(inst._rt.has_value() && inst._rs.has_value() && inst._immediate_value.has_value()) {
-        int rt = inst._rt.value();
-        int rs = inst._rs.value();
-        int immediate_value = inst._immediate_value.value();
+        uint32_t rt = inst._rt.value();
+        uint32_t rs = inst._rs.value();
+        uint32_t immediate_value = inst._immediate_value.value();
         registers[rs] = registers[rt] | immediate_value;
         return pc+1;
     }else{
@@ -630,11 +632,11 @@ int MIPSsim::_ori(Instruction& inst, int pc) {
     return 0;
 }
 
-int MIPSsim::_xori(Instruction& inst, int pc) {
+uint32_t MIPSsim::_xori(Instruction& inst, uint32_t pc) {
     if(inst._rt.has_value() && inst._rs.has_value() && inst._immediate_value.has_value()) {
-        int rt = inst._rt.value();
-        int rs = inst._rs.value();
-        int immediate_value = inst._immediate_value.value();
+        uint32_t rt = inst._rt.value();
+        uint32_t rs = inst._rs.value();
+        uint32_t immediate_value = inst._immediate_value.value();
         registers[rs] = registers[rt] ^ immediate_value;
         return pc+1;
     }else{
@@ -643,9 +645,9 @@ int MIPSsim::_xori(Instruction& inst, int pc) {
     return 0;
 }
 
-int MIPSsim::_j(Instruction& inst, int pc) {
+uint32_t MIPSsim::_j(Instruction& inst, uint32_t pc) {
     if(inst._immediate_value.has_value()) {
-        int immediate_value = inst._immediate_value.value();
+        uint32_t immediate_value = inst._immediate_value.value();
         return (immediate_value - base_address) / 4;
     }else{
         std::throw_with_nested(std::runtime_error("立即数错误"));
@@ -653,11 +655,11 @@ int MIPSsim::_j(Instruction& inst, int pc) {
     return 0;
 }
 
-int MIPSsim::_beq(Instruction& inst, int pc) {
+uint32_t MIPSsim::_beq(Instruction& inst, uint32_t pc) {
     if(inst._rs.has_value() && inst._rt.has_value() && inst._offset.has_value()) {
-        int rs = inst._rs.value();
-        int rt = inst._rt.value();
-        int offset = inst._offset.value();
+        uint32_t rs = inst._rs.value();
+        uint32_t rt = inst._rt.value();
+        uint32_t offset = inst._offset.value();
         if(registers[rs] == registers[rt]) {
             pc += offset / 4;
         }
@@ -668,10 +670,10 @@ int MIPSsim::_beq(Instruction& inst, int pc) {
     return 0;
 }
 
-int MIPSsim::_bgtz(Instruction& inst, int pc) {
+uint32_t MIPSsim::_bgtz(Instruction& inst, uint32_t pc) {
     if(inst._rs.has_value() && inst._offset.has_value()) {
-        int rs = inst._rs.value();
-        int offset = inst._offset.value();
+        uint32_t rs = inst._rs.value();
+        uint32_t offset = inst._offset.value();
         if(registers[rs] > 0) {
             pc += offset / 4;
         }
@@ -682,11 +684,11 @@ int MIPSsim::_bgtz(Instruction& inst, int pc) {
     return 0;
 }
 
-int MIPSsim::_sw(Instruction& inst, int pc) {
+uint32_t MIPSsim::_sw(Instruction& inst, uint32_t pc) {
     if(inst._rs.has_value() && inst._rt.has_value() && inst._offset.has_value()) {
-        int rs = inst._rs.value();
-        int rt = inst._rt.value();
-        int offset = inst._offset.value();
+        uint32_t rs = inst._rs.value();
+        uint32_t rt = inst._rt.value();
+        uint32_t offset = inst._offset.value();
         data[(registers[rs] + offset - base_data_address)/4] = registers[rt];
         return pc+1;
     }else{
@@ -695,11 +697,11 @@ int MIPSsim::_sw(Instruction& inst, int pc) {
     return 0;
 }
 
-int MIPSsim::_lw(Instruction& inst, int pc) {   
+uint32_t MIPSsim::_lw(Instruction& inst, uint32_t pc) {   
     if(inst._rt.has_value() && inst._rs.has_value() && inst._offset.has_value()) {
-        int rt = inst._rt.value();
-        int rs = inst._rs.value();
-        int offset = inst._offset.value();
+        uint32_t rt = inst._rt.value();
+        uint32_t rs = inst._rs.value();
+        uint32_t offset = inst._offset.value();
         registers[rt] = data[(registers[rs] + offset - base_data_address)/4];
         return pc+1;
     }else{
@@ -708,7 +710,7 @@ int MIPSsim::_lw(Instruction& inst, int pc) {
     return 0;
 }   
 
-int MIPSsim::_break(Instruction& inst, int pc) {
+uint32_t MIPSsim::_break(Instruction& inst, uint32_t pc) {
     return pc+1;
 }
 
