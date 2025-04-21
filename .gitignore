@@ -4,3 +4,5 @@ cmake-build-debug/
 build/
 generated_disassembly.txt
 MIPSsim
+MIPSsim.cpp.txt
+MIPSsim.exe
