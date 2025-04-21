@@ -1,1 +1,6 @@
 Proj.pdf
+.vscode/
+cmake-build-debug/
+build/
+generated_disassembly.txt
+MIPSsim
