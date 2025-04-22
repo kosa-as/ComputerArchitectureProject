@@ -24,8 +24,8 @@ MIPSsim是一个模拟MIPS处理器执行指令的工具。本模拟器实现了
 
 ```bash
 git clone https://github.com/kosa-as/ComputerArchitectureProject.git
-git checkout proj2
 cd ComputerArchitectureProject
+git checkout proj2
 ```
 
 ### 2. 编译项目
