@@ -1,8 +1,9 @@
-Proj.pdf
 .vscode/
-cmake-build-debug/
 build/
+Proj.pdf
+cmake-build-debug/
 generated_disassembly.txt
 MIPSsim
 MIPSsim.cpp.txt
 MIPSsim.exe
+.idea/

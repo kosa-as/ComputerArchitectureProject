@@ -12,8 +12,6 @@
 #include <functional>
 #include <iomanip>
 #include <queue>
-#include <iostream> 
-#include <set>
 constexpr uint32_t base_address = 0x00000080;
 constexpr int pre_issue_queue_length = 4;
 constexpr int pre_alu_queue_length = 2;
@@ -21,10 +19,11 @@ constexpr int post_alu_queue_length = 1;
 constexpr int pre_mem_queue_length = 1;
 constexpr int post_mem_queue_length = 1;
 constexpr int max_issue_instruction = 2;
-/*
-    @param value: 寄存器编号
-    @param args: 寄存器编号
-    @return: 寄存器编号对应的名称拼接的字符串
+/** 
+*    @brief: 将寄存器编号转换为字符串
+*    @param value: 寄存器编号
+*    @param args: 寄存器编号
+*    @return: 寄存器编号对应的名称拼接的字符串
     例如：int_to_string_reg(0) = "R0"
           int_to_string_reg(0, 1) = "R0, R1"
           int_to_string_reg(0, 1, 2) = "R0, R1, R2"
@@ -59,29 +58,28 @@ enum class InstructionType : unsigned int{
     DATA,
     UNKNOWN
 };
-enum class InstructionStatus : unsigned int{
-    WAITING,
-    FETCHED,
-    ISSUED,
-    EXECUTED,
-    WRITTEN
-};
-/*
-    @param instruction: 指令的二进制表示
-    @param type: 指令类型
-    @param instruction_detail: 指令的详细信息(地址加指令)
-    @param print_instruction_detail: 打印到txt的指令的详细信息
-    @param address: 指令的地址
-    @param _rs: 指令的源寄存器(可选)
-    @param _rt: 指令的目标寄存器(可选)
-    @param _rd: 指令的目的寄存器(可选)
-    @param _immediate_value: 指令的立即数(可选)
-    @param _offset: 指令的偏移量(可选)
-    @param _value: data部分的值(可选)
+
+/** 
+*    @brief:相比与proj1，添加了cache_result,和get_result_register_index,get_source_register_index这两个封装了返回目的寄存器和源寄存器的函数
+*    @param instruction: 指令的二进制表示
+*    @param type: 指令类型
+*    @param instruction_detail: 指令的详细信息(地址加指令)
+*    @param print_instruction_detail: 打印到txt的指令的详细信息
+*    @param address: 指令的地址
+*    @param _rs: 指令的源寄存器(可选)
+*    @param _rt: 指令的目标寄存器(可选)
+*    @param _rd: 指令的目的寄存器(可选)
+*    @param _immediate_value: 指令的立即数(可选)
+*    @param _offset: 指令的偏移量(可选)
+*    @param _value: data部分的值(可选)
+*    @param cache_result: 指令的执行结果的暂时存储，写回时就要取从cache_result中取(可选)
+*    @param category_1_map: 指令分类1的静态map
+*    @param category_2_map: 指令分类2的静态map
+*    @param category_3_map: 指令分类3的静态map
 */
 struct Instruction {
     uint32_t instruction{};
-    InstructionType type;
+    InstructionType type = InstructionType::UNKNOWN;
     std::string instruction_detail;
     std::string print_instruction_detail;
     uint32_t address{};
@@ -93,7 +91,6 @@ struct Instruction {
     std::optional<int> _value;
     //proj2新添加的，用来标识指令的状态,表示是否发射，是否读取，是否执行，是否写回
     std::optional<int> cache_result;//用来暂时存储指令的执行结果
-    InstructionStatus status = InstructionStatus::WAITING;
     static std::unordered_map<unsigned int, std::string> category_1_map;
     static std::unordered_map<unsigned int, std::string> category_2_map;
     static std::unordered_map<unsigned int, std::string> category_3_map;
@@ -102,8 +99,12 @@ struct Instruction {
     void process_category_2();
     void process_category_3();
     void process_category_4();
-
-    inline std::optional<int> get_result_register_index() const {
+/** 
+*    @brief: 获取目的寄存器
+*    使用optional封装，因为可能没有目的寄存器，且不同的指令返回的目的寄存器不同
+*    @return: 目的寄存器
+*/
+    [[nodiscard]] inline std::optional<int> get_result_register_index() const {
         if(_rd.has_value() && 
         (type == InstructionType::ADD || type == InstructionType::SUB 
         || type == InstructionType::MUL || type == InstructionType::AND 
@@ -121,7 +122,12 @@ struct Instruction {
         }
         return std::nullopt;
     }
-    inline std::tuple<std::optional<int>, std::optional<int>> get_source_register_index() const {
+/** 
+*    @brief: 获取源寄存器
+*    使用optional封装，因为可能没有源寄存器，且不同的指令返回的源寄存器不同
+*    @return: 源寄存器
+*/
+    [[nodiscard]] inline std::tuple<std::optional<int>, std::optional<int>> get_source_register_index() const {
         if(type == InstructionType::ADD || type == InstructionType::SUB 
         || type == InstructionType::MUL || type == InstructionType::AND 
         || type == InstructionType::OR || type == InstructionType::XOR 
@@ -139,31 +145,31 @@ struct Instruction {
     }
 };
 
-/*
-    @param is_busy: 是否忙碌(busy)
-    @param operation: 操作类型(operation)
-    @param reg_destination: 目标寄存器(Fi)
-    @param reg_source_1: 源寄存器1(Fj)
-    @param reg_source_2: 源寄存器2(Fk)
-    @param occupation_reg_source_1: 源寄存器1的占用者是哪个ALU(Qj)
-    @param occupation_reg_source_2: 源寄存器2的占用者是哪个ALU(Qk)
-    @param is_occupied_reg_source_1: 源寄存器1是否可以使用(Rj)
-    @param is_occupied_reg_source_2: 源寄存器2是否可以使用(Rk)
-*/
 
 // 这里声明了函数指针的类型，用于存储指令的执行函数。std::function是C++11标准库中的一个模板类，用于存储和调用函数对象。
 using Func = std::function<void(Instruction&)>;
 using jump_func = std::function<void(Instruction& , int&)>;
-/*
-    @param instructions: 指令列表
-    @param input_filename: 输入文件名
-    @param output_filename: 输出文件名
-    @param simulation_filename: 模拟执行文件名
-    @param registers: 寄存器数组
-    @param data: 数据列表
-    @param base_data_address: 数据段的起始地址
-    @param select_instruction: 选择指令的函数
-    @param is_break: 是否是break指令,区别数据段还是指令段
+/** 
+*    @param instructions: 指令列表
+*    @param input_filename: 输入文件名
+*    @param output_filename: 输出文件名
+*    @param simulation_filename: 模拟执行文件名
+*    @param registers: 寄存器数组
+*    @param data: 数据列表
+*    @param base_data_address: 数据段的起始地址
+*    @param select_instruction: 选择指令的函数
+*    @param is_break: 是否是break指令,区别数据段还是指令段
+*    proj2新添加的内容
+*    @param register_result_status: 寄存器结果状态
+*    @param register_result_status_next_cycle: 下一个周期寄存器结果状态暂存
+*    @param waiting_instruction_pc: 等待指令的PC
+*    @param executed_instruction_pc: 执行指令的PC
+*    @param pre_issue_queue: 预发射队列
+*    @param last_cycle_issue_queue: 上一个周期发射队列
+*    @param pre_alu_queue: 预ALU队列
+*    @param post_alu_queue: 后ALU队列
+*    @param pre_mem_queue: 预访存队列
+*    @param post_mem_queue: 后访存队列
 */
 class MIPSsim {
     std::vector<Instruction> instructions;
@@ -192,24 +198,35 @@ class MIPSsim {
     void _beq(Instruction& inst, int& pc);
     void _bgtz(Instruction& inst, int& pc);
     void _break(Instruction& inst, int& pc);
-    void print_registers();
-    void print_data();
     //proj2新添加的内容
+    /** 
+    *    @brief: 固定大小的队列
+    *    @param T: 队列的类型
+    *    @param max_size: 队列的最大大小
+    *    @param last_cycle_full: 上一个周期是否满了
+    *    @param is_full: 是否满了
+    *    @param get_max_size: 获取队列的最大大小
+    *    @param begin: 获取队列的开始迭代器
+    *    @param end: 获取队列的结束迭代器
+    *    @param sort_instruction: 排序指令
+    */
     template<typename T>
     class FixedSizeQueue : public std::queue<T> {
         size_t max_size;
         bool last_cycle_full;
         public:
-            explicit FixedSizeQueue(size_t size) : max_size(size) {}
+            explicit FixedSizeQueue(size_t size) : max_size(size) {
+                last_cycle_full = is_full();
+            }
             
             bool is_full() const { return this->size() >= max_size; }
             size_t get_max_size() const { return max_size; }
             
             auto begin() { return this->c.begin(); }
             auto end() { return this->c.end(); }
-            void sort_instruction() {
+            void sort_instruction() {//按照地址从低到高排序
                 std::sort(this->begin(), this->end(), 
-                          [](const Instruction& a, const Instruction& b) { 
+                          [](const Instruction& a, const Instruction& b){ 
                               return a.address < b.address; 
                           });
             }
@@ -251,7 +268,9 @@ class MIPSsim {
                 return os;
             }
     };
+
     FixedSizeQueue<Instruction> pre_issue_queue{pre_issue_queue_length};
+    //上一个周期发射队列,由于fetch到branch instruction时，需要检查是否存在RAW hazard，所以需要保存上一个周期的发射队列。已经发射的可以通过register_result_status来判断
     FixedSizeQueue<Instruction> last_cycle_issue_queue{pre_issue_queue_length};
     FixedSizeQueue<Instruction> pre_alu_queue{pre_alu_queue_length};
     FixedSizeQueue<Instruction> post_alu_queue{post_alu_queue_length};
@@ -259,7 +278,6 @@ class MIPSsim {
     FixedSizeQueue<Instruction> post_mem_queue{post_mem_queue_length};
     std::array<int, 32> register_result_status;
     std::array<int, 32> register_result_status_next_cycle;
-    std::unordered_map<uint32_t, Instruction> instruction_status;
     bool check_issue_hazard(const Instruction& inst) const;
     int waiting_instruction_pc = -1;
     int executed_instruction_pc = -1;
@@ -269,6 +287,7 @@ class MIPSsim {
     void issue();
     void instruction_fetch(uint32_t& pc);
     bool is_branch_instruction(const Instruction& inst)const;
+    //更新snapshot，snapshot是更新寄存器状态，队列是否为满以及保存上周期的pre-issue。通过更新来避免structure hazards
     void update_snapshot();
     public:
         static bool is_break;
@@ -283,9 +302,7 @@ class MIPSsim {
         void set_simulation_filename(const std::string& filename);
 };
 
-InstructionType stringToInstruction(const std::string& str);
-
-std::unordered_map<std::string, InstructionType> stringToInstructionMap = {
+static std::unordered_map<std::string, InstructionType> stringToInstructionMap = {
     {"ADD", InstructionType::ADD},
     {"SUB", InstructionType::SUB},
     {"MUL", InstructionType::MUL},
@@ -464,30 +481,6 @@ jump_func MIPSsim::select_jump_instruction(Instruction& inst) {
             return nullptr;
     }
 }
-void MIPSsim::print_registers() {
-    std::cout << "Registers" << std::endl;
-    for(int i = 0; i < 32; i += 8) {
-        std::cout << "R" << std::setfill('0') << std::setw(2) << i << ":\t";
-        for(int j = 0; j < 8; j++) {
-            std::cout << registers[i + j] << "\t";
-        }
-        std::cout << std::endl;
-    }
-}
-
-void MIPSsim::print_data() {
-    std::cout << "Data" << std::endl;
-    int data_size = data.size();
-    int row = (data_size + 7) / 8;
-    for(int i = 0; i < row; i++) {
-        std::cout << i*32 + base_data_address << ":\t";
-        for(int j = i*8; j < (i+1)*8 && j < data_size; j++) {
-            std::cout << data[j] << "\t";
-        }
-        std::cout << std::endl;
-    }
-}
-
 
 //写回的时候，在post_mem_queue和post_alu_queue中，最多各执行一次
 void MIPSsim::write_back() {
@@ -496,24 +489,22 @@ void MIPSsim::write_back() {
         post_mem_queue.pop();
         registers[inst.get_result_register_index().value()] = inst.cache_result.value();
         register_result_status_next_cycle[inst.get_result_register_index().value()] = -1;
-        instruction_status.erase(inst.address);
     }
     if(!post_alu_queue.empty()) {
         auto inst = post_alu_queue.front();
         post_alu_queue.pop();
         registers[inst.get_result_register_index().value()] = inst.cache_result.value();
         register_result_status_next_cycle[inst.get_result_register_index().value()] = -1;
-        instruction_status.erase(inst.address);
     }
 }
+/*指令获取/译码单元行为说明
+    指令获取/译码单元在每个周期最多可以顺序地获取并译码两条指令。在获取新指令之前，必须检查以下所有条件是否满足：
+     - 如果在上一个周期末获取单元被暂停（stalled），那么当前周期不能获取任何指令。获取单元可能因为分支指令（branch instruction）而暂停。
+     - 如果在上一个周期末，Pre-issue 队列中没有空位，那么当前周期也不能获取任何指令。
+    通常，整个“获取-译码”操作可以在一个周期内完成。被译码的指令会在当前周期末放入 Pre-issue 队列中。
+ */
 void MIPSsim::instruction_fetch(uint32_t& pc) {
-    int length = instructions.size() - data.size();
     if(pre_issue_queue.get_last_cycle_full()){
-        return;
-    }
-    if(instructions[pc].type == InstructionType::BREAK) {
-        executed_instruction_pc = pc;
-        pc++;
         return;
     }
     if(executed_instruction_pc != -1) {
@@ -523,7 +514,7 @@ void MIPSsim::instruction_fetch(uint32_t& pc) {
     if(is_branch_instruction(instructions[pc])) {
         int next_pc = pc;
         auto [rs, rt] = instructions[pc].get_source_register_index();
-        // RAW hazard
+        // RAW hazard: If a branch instruction is fetched, the fetch unit will try to read all the necessary registers to calculate the target address.
         if((!rs.has_value() || register_result_status[rs.value()] == -1) 
         &&(!rt.has_value() || register_result_status[rt.value()] == -1)// issued instruction
         && [&](){//pre-issued instruction
@@ -551,7 +542,6 @@ void MIPSsim::instruction_fetch(uint32_t& pc) {
         }
     }else{
         pre_issue_queue.push(instructions[pc]);
-        instruction_status[instructions[pc].address] = instructions[pc];
         pc++;
     }
     //第二次取指令
@@ -562,7 +552,7 @@ void MIPSsim::instruction_fetch(uint32_t& pc) {
         if((!rs.has_value() || register_result_status[rs.value()] == -1) 
         &&(!rt.has_value() || register_result_status[rt.value()] == -1)
         &&[&](){//pre-issued instruction
-            auto temp_queue = pre_issue_queue;
+            auto temp_queue = last_cycle_issue_queue;
             while(!temp_queue.empty()) {
                 auto& instruction = temp_queue.front();
                 auto rd = instruction.get_result_register_index();
@@ -570,6 +560,11 @@ void MIPSsim::instruction_fetch(uint32_t& pc) {
                     return false;
                 }
                 temp_queue.pop();
+            }
+            //和第一次取指令不同，如果第二个指令fetch到了branch指令，那么需要检查是否存在RAW hazard，和第一条fetch的指令
+            auto fetch_last_rd = instructions[pc-1].get_result_register_index();
+            if(fetch_last_rd.has_value() && (rs.has_value() && fetch_last_rd.value() == rs.value() || rt.has_value() && fetch_last_rd.value() == rt.value())) {
+                return false;
             }
             return true;
         }()) {
@@ -586,7 +581,6 @@ void MIPSsim::instruction_fetch(uint32_t& pc) {
         }
     }else{
         pre_issue_queue.push(instructions[pc]);
-        instruction_status[instructions[pc].address] = instructions[pc];
         pc++;
     }
 }
@@ -753,7 +747,6 @@ void MIPSsim::issue() {
                     continue;
                 }
             }
-            instruction_status[inst.address] = inst;
             pre_alu_queue.push(inst);
             issue_count++;
             //issue_bookkeeping
@@ -784,9 +777,6 @@ void MIPSsim::alu_unit() {//The pre-alu queue is managed as FIFO (in-order) queu
     }
     else{
         func(inst);
-        if(instruction_status.find(inst.address) != instruction_status.end()) {
-            instruction_status[inst.address].status = InstructionStatus::EXECUTED;
-        }
         post_alu_queue.push(inst);
     }
 }
@@ -796,19 +786,13 @@ void MIPSsim::mem_unit() {
     }
     auto inst = pre_mem_queue.front();
     pre_mem_queue.pop();
-    //For SW instruction, MEM also takes one cycle to finish (write the data to memory). When a SW instruction finishes, nothing would be sent to Post-MEM queue.
+    //For SW instruction, MEM also takes one cycle to finish (write the data to memory). When an SW instruction finishes, nothing would be sent to Post-MEM queue.
     if(inst.type == InstructionType::SW && inst.cache_result.has_value() && inst._rt.has_value()) {
         data[inst.cache_result.value()] = registers[inst._rt.value()];
-        if(instruction_status.find(inst.address) != instruction_status.end()) {
-            instruction_status.erase(inst.address);
-        }
     }else{
         //When a LW instruction finishes, the instruction with destination register id and the data will be written to the Post-MEM queue
         if(inst.cache_result.has_value() ) {
             inst.cache_result = data[inst.cache_result.value()];
-        }
-        if(instruction_status.find(inst.address) != instruction_status.end()) {
-            instruction_status[inst.address].status = InstructionStatus::EXECUTED; 
         }
         post_mem_queue.push(inst);
     }
@@ -834,9 +818,8 @@ void MIPSsim::excute() {
     //这里开始重写proj2的执行逻辑
     uint32_t pc = 0;
     int count = 1;
-    // -1 是break指令的需求
     int length = instructions.size() - data.size();
-    while(pc < length && count < 100) {
+    while(pc < length) {
         update_snapshot();
         write_back();
         mem_unit();
