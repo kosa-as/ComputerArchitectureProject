@@ -616,6 +616,18 @@ bool MIPSsim::check_issue_hazard(const Instruction& inst) const {
 
     //check if there is a RAW hazard
     auto [rs, rt] = inst.get_source_register_index();
+    auto tmp_queue = pre_issue_queue;
+    while(!tmp_queue.empty()) {
+        auto& instruction = tmp_queue.front();
+        auto rd = instruction.get_result_register_index();
+        if(instruction.address < inst.address && rd.has_value()&& rs.has_value() && rs.value() == rd.value()) {
+            return false;
+        }
+        if(instruction.address < inst.address && rd.has_value()&& rt.has_value() && rt.value() == rd.value()) {
+            return false;
+        }
+        tmp_queue.pop();
+    }
     if(rs.has_value() && rt.has_value()) {
         if(register_result_status[rs.value()] != -1 ||
         register_result_status[rt.value()] != -1) {
@@ -627,7 +639,7 @@ bool MIPSsim::check_issue_hazard(const Instruction& inst) const {
             return false;
         }
     }
-
+    
     //check if there is a WAR hazard
     // No WAR hazards with earlier not-issued instructions
     auto temp_queue = pre_issue_queue;
