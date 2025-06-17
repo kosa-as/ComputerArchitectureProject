@@ -1,4 +1,4 @@
-﻿#include "../basic/testing.h"
+﻿#include "../testing.h"
 #include <irq.h>
 #include <clock.h>
 #include <clock_arch.h>
@@ -11,8 +11,8 @@
 #include <errno.h>
 #include <string.h>
 
-#define NUM_TASKS 10
-#define NUM_ROUNDS 1000
+
+#define NUM_ROUNDS 2000
 #define STACK_SIZE (32 << 10)
 
 // Priority range
@@ -20,9 +20,13 @@
 #define MID_PRIORITY_BASE 100
 #define LOW_PRIORITY_BASE 80
 
+#define MAX_TASK_NUM 15
+
 extern u32 get_cntfrq();
 
 static sem_t *task_semid;
+
+static int delay_time;
 
 // Statistics
 typedef struct {
@@ -72,9 +76,8 @@ void* mutex_task(void* arg) {
         } while (!__sync_bool_compare_and_swap(&stats.min_preempt_ns, current_min, preempt_response_ns));
         
         // Record slow preemption
-        if (preempt_response_ns > 1000000) { // Preemption response over 1ms
+        if (preempt_response_ns > 3000000) { // Preemption response over 3ms
             __sync_fetch_and_add(&stats.slow_preemptions, 1);
-            // printk("[Warning] Slow preemption response! Response time: %.3f ms\n", (double)preempt_response_ns / 1000000.0);
         }
     }
     u64 lock_start;
@@ -111,7 +114,8 @@ void* mutex_task(void* arg) {
         }
     }
 
-    udelay(1000);
+    delay_time = rand() % 300 + 200;
+    udelay(delay_time);
     
     ret = sem_post(task_semid);
     if (ret != 0) {
@@ -126,54 +130,88 @@ void* mutex_task(void* arg) {
 // Non-competing tasks: queue jumping execution
 void* no_mutex_task(void* arg) {
     // Simulate random workload
-    udelay(1000);
+    delay_time = rand() % 300 + 200;
+    udelay(delay_time);
     return NULL;
 }
 
+pthread_t* create_task_array(int task_num){
+    if(task_num == 0){
+        return NULL;
+    }
+    pthread_t* task_array = (pthread_t*)malloc(task_num * sizeof(pthread_t));
+    // for(int i = 0; i < task_num; i++){
+    //     task_array[i] = NULL;
+    // }
+    return task_array;
+}
+
+task_args_t* create_task_args_array(int task_num){
+    if(task_num == 0){
+        return NULL;
+    }
+    task_args_t* task_args_array = (task_args_t*)malloc(task_num * sizeof(task_args_t));
+    // for(int i = 0; i < task_num; i++){
+    //     task_args_array[i].ready_time = 0;
+    // }
+    memset(task_args_array, 0, task_num * sizeof(task_args_t));
+    return task_args_array;
+}
 
 int run_one_round() {
-    pthread_t high_priority_mutex_tid[2];
-    pthread_t low_priority_mutex_tid[2];
-    pthread_t no_mutex_tid[6];
-    task_args_t high_args[2];
+
+    int total_task_num = rand() % MAX_TASK_NUM + 1;
+    int high_task_num = rand() % (total_task_num + 1);
+    int low_task_num = rand() % (total_task_num - high_task_num + 1);
+    int no_task_num = total_task_num - high_task_num - low_task_num;
+
+    // printk("Total task number: %d, High priority task number: %d, Low priority task number: %d, Non-mutex task number: %d\n", total_task_num, high_task_num, low_task_num, no_task_num);
+    
+    pthread_t* high_priority_mutex_tid = create_task_array(high_task_num);
+    pthread_t* low_priority_mutex_tid = create_task_array(low_task_num);
+    pthread_t* no_mutex_tid = create_task_array(no_task_num);
+
+    task_args_t* high_args = create_task_args_array(high_task_num);
+
     int ret;    
-    for(int i = 0; i < 2; i++){
+    for(int i = 0; i < high_task_num; i++){
         high_args[i].ready_time = sys_timestamp();
         ret = pthread_create2(&high_priority_mutex_tid[i], "high_priority_mutex_tid", HIGH_PRIORITY_BASE, 0, STACK_SIZE, mutex_task, &high_args[i]);
         pthread_suspend(high_priority_mutex_tid[i]);
         if(ret != 0){
             sem_close(task_semid);
+            pthread_cancel(high_priority_mutex_tid[i]);
             printk("[Error] Failed to create high priority mutex task: %s\n", strerror(ret));
             return ret;
         }
     }
-    for(int i = 0; i < 2; i++){
+    for(int i = 0; i < low_task_num; i++){
         ret = pthread_create2(&low_priority_mutex_tid[i], "low_priority_mutex_tid", LOW_PRIORITY_BASE, 0, STACK_SIZE, mutex_task, NULL);
         pthread_suspend(low_priority_mutex_tid[i]);
         if(ret != 0){
             sem_close(task_semid);
+            pthread_cancel(low_priority_mutex_tid[i]);
             printk("[Error] Failed to create low priority mutex task: %s\n", strerror(ret));
             return ret;
         }
     }
-    for(int i = 0; i < 6; i++){
+    for(int i = 0; i < no_task_num; i++){
         ret = pthread_create2(&no_mutex_tid[i], "no_mutex_tid", MID_PRIORITY_BASE, 0, STACK_SIZE, no_mutex_task, NULL);
         pthread_suspend(no_mutex_tid[i]);
         if(ret != 0){
             sem_close(task_semid);
+            pthread_cancel(no_mutex_tid[i]);
             printk("[Error] Failed to create non-mutex task: %s\n", strerror(ret));
             return ret;
         }
     }
 
     // ensure each task is resumed once
-    int task_order[NUM_TASKS];
-    for(int i = 0; i < NUM_TASKS; i++){
+    int* task_order = (int*)malloc(total_task_num * sizeof(int));
+    for(int i = 0; i < total_task_num; i++){
         task_order[i] = i;
     }
-    
-    // Shuffle task order
-    for(int i = NUM_TASKS - 1; i > 0; i--){
+    for(int i = total_task_num - 1; i > 0; i--){
         int j = rand() % (i + 1);
         int temp = task_order[i];
         task_order[i] = task_order[j];
@@ -181,28 +219,35 @@ int run_one_round() {
     }
     
     // Resume tasks in shuffled order
-    for(int i = 0; i < NUM_TASKS; i++){
+    for(int i = 0; i < total_task_num; i++){
         int task_idx = task_order[i];
-        if(task_idx < 2){
+        if(task_idx < high_task_num){
             high_args[task_idx].ready_time = sys_timestamp();
             pthread_resume(high_priority_mutex_tid[task_idx]);
-        }else if(task_idx < 4){
-            pthread_resume(low_priority_mutex_tid[task_idx - 2]);
+        }else if(task_idx < high_task_num + low_task_num){
+            pthread_resume(low_priority_mutex_tid[task_idx - high_task_num]);
         }else{
-            pthread_resume(no_mutex_tid[task_idx - 4]);
+            pthread_resume(no_mutex_tid[task_idx - high_task_num - low_task_num]);
         }
-        usleep(300);
+        usleep(200);
     }
 
-    for(int i = 0; i < 2; i++){
+    for(int i = 0; i < high_task_num; i++){
         pthread_join(high_priority_mutex_tid[i], NULL);
     }
-    for(int i = 0; i < 2; i++){
+    for(int i = 0; i < low_task_num; i++){
         pthread_join(low_priority_mutex_tid[i], NULL);
     }
-    for(int i = 0; i < 6; i++){
+    for(int i = 0; i < no_task_num; i++){
         pthread_join(no_mutex_tid[i], NULL);
     }
+
+    if(high_priority_mutex_tid != NULL) free(high_priority_mutex_tid);
+    if(low_priority_mutex_tid != NULL) free(low_priority_mutex_tid);
+    if(no_mutex_tid != NULL) free(no_mutex_tid);
+    if(high_args != NULL) free(high_args);
+    if(task_order != NULL) free(task_order);
+    
     return 0;
 }
 
@@ -215,7 +260,7 @@ void test_task_preempt() {
     int success_rounds = 0;
     for (int i = 0; i < NUM_ROUNDS; i++) {
         
-        task_semid = sem_open("task_semid",O_CREAT, 0777, rand() % 3 + 1, SEM_COUNTING, PTHREAD_WAITQ_PRIO);
+        task_semid = sem_open("task_semid",O_CREAT, 0777, rand() % MAX_TASK_NUM + 1, SEM_COUNTING, PTHREAD_WAITQ_PRIO);
         if (task_semid == SEM_FAILED)
         {
             printk("Failed to create semaphore\n");
@@ -229,6 +274,7 @@ void test_task_preempt() {
             success_rounds++;
         }
         sem_close(task_semid);
+        sem_unlink("task_semid");
     }
     
     // Output detailed statistics
@@ -239,20 +285,19 @@ void test_task_preempt() {
     printk("Total priority inversions: %d\n", stats.total_inversions);
     if (stats.total_inversions > 0) {
         printk("Severe inversions (>4ms): %d\n", stats.severe_inversions);
-        printk("Average blocking time: %10d ns\n", (int)(stats.total_delay_ns / stats.total_inversions / 1000.0));
-        printk("Maximum blocking time: %10d ns\n", (int)(stats.max_delay_ns / 1000.0));
-        printk("Priority inversion rate: %10d%%\n", (int)(stats.total_inversions / success_rounds * 100.0));
+        printk("Average blocking time: %10d ns\n", stats.total_delay_ns / stats.total_inversions / 1000);
+        printk("Maximum blocking time: %10d ns\n", stats.max_delay_ns / 1000);
+        printk("Priority inversion rate: %10d%%\n", (stats.total_inversions / success_rounds * 100));
     }
     
     printk("\n--- Preemption Response Time Statistics ---\n");
     printk("Total preemptions: %d\n", stats.total_preemptions);
     if (stats.total_preemptions > 0) {
         printk("Slow preemptions (>1ms): %d\n", stats.slow_preemptions);
-        printk("Average preemption response time: %10d ns\n", (int)(stats.total_preempt_ns / stats.total_preemptions / 1000.0));
-        printk("Maximum preemption response time: %10d ns\n", (int)(stats.max_preempt_ns / 1000.0));
-        printk("Minimum preemption response time: %10d ns\n", (int)(stats.min_preempt_ns / 1000.0));
-        printk("Slow preemption rate: %d%%\n", (int)(stats.slow_preemptions / stats.total_preemptions * 100.0));
+        printk("Average preemption response time: %10d ns\n", (stats.total_preempt_ns / stats.total_preemptions / 1000));
+        printk("Maximum preemption response time: %10d ns\n", (stats.max_preempt_ns / 1000));
+        printk("Minimum preemption response time: %10d ns\n", (stats.min_preempt_ns / 1000));
+        printk("Slow preemption rate: %d%%\n", (stats.slow_preemptions / stats.total_preemptions * 100));
     }
     printk("================================================\n");
-    sem_unlink("task_semid");
 }
