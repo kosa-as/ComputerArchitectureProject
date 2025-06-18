@@ -4,3 +4,4 @@ MIPSsim
 include/
 files/
 task_preempt/task_preempt.md
+task_preempt/result.png
