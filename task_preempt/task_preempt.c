@@ -10,7 +10,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
-
+#include <stdbool.h>
 
 #define NUM_ROUNDS 2000
 #define STACK_SIZE (32 << 10)
@@ -27,6 +27,8 @@ extern u32 get_cntfrq();
 static sem_t *task_semid;
 
 static int delay_time;
+
+static bool is_inversion = false;
 
 // Statistics
 typedef struct {
@@ -85,7 +87,8 @@ void* mutex_task(void* arg) {
         lock_start = sys_timestamp();
     }
     // Acquire lock
-    int ret = sem_wait(task_semid);
+    int ret;
+    ret = sem_wait(task_semid);
     if (ret != 0) {
         sem_close(task_semid);
         printk("[Error] Low priority task cannot acquire mutex: %s\n", strerror(ret));
@@ -98,7 +101,7 @@ void* mutex_task(void* arg) {
         if (delay_ns > 1500) {// Over 1.5ms indicates blocking
             __sync_fetch_and_add(&stats.total_inversions, 1);
             __sync_add_and_fetch(&stats.total_delay_ns, delay_ns);
-            
+            is_inversion = true;
             // Update maximum delay time
             u64 current_max;
             do {
@@ -164,6 +167,8 @@ int run_one_round() {
     int high_task_num = rand() % (total_task_num + 1);
     int low_task_num = rand() % (total_task_num - high_task_num + 1);
     int no_task_num = total_task_num - high_task_num - low_task_num;
+
+    is_inversion = false;
 
     // printk("Total task number: %d, High priority task number: %d, Low priority task number: %d, Non-mutex task number: %d\n", total_task_num, high_task_num, low_task_num, no_task_num);
     
@@ -241,7 +246,24 @@ int run_one_round() {
     for(int i = 0; i < no_task_num; i++){
         pthread_join(no_mutex_tid[i], NULL);
     }
-
+    
+    if(is_inversion){
+        printk("================================================\n");
+        printk("Inversion start task name: ");
+        for(int i = 0; i < total_task_num; i++){
+            int task_idx = task_order[i];
+            if(task_idx < high_task_num){
+                printk("high_priority_mutex_tid - ");
+            }else if(task_idx < high_task_num + low_task_num){
+                printk("low_priority_mutex_tid - ");
+            }else{
+                printk("no_mutex_tid - ");
+            }
+        }
+        printk("\n");
+        printk("================================================\n");
+    }
+    
     if(high_priority_mutex_tid != NULL) free(high_priority_mutex_tid);
     if(low_priority_mutex_tid != NULL) free(low_priority_mutex_tid);
     if(no_mutex_tid != NULL) free(no_mutex_tid);
@@ -285,9 +307,6 @@ void test_task_preempt() {
     printk("Total priority inversions: %d\n", stats.total_inversions);
     if (stats.total_inversions > 0) {
         printk("Severe inversions (>4ms): %d\n", stats.severe_inversions);
-        printk("Average blocking time: %10d ns\n", stats.total_delay_ns / stats.total_inversions / 1000);
-        printk("Maximum blocking time: %10d ns\n", stats.max_delay_ns / 1000);
-        printk("Priority inversion rate: %10d%%\n", (stats.total_inversions / success_rounds * 100));
     }
     
     printk("\n--- Preemption Response Time Statistics ---\n");

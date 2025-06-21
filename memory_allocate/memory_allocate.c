@@ -9,14 +9,15 @@
 内部碎片：每次malloc的时候，调用钩子函数记录申请的大小和实际分配的大小（分配的时候，钩子函数还要去计算时间）
 外部碎片：由负责记录的任务定时调用记录内存的情况（包括最大的可用块大小）
 */
-#define MALLOC_NUM 4
+#define MALLOC_NUM 5
 
 typedef struct{
     u64 memory_malloc_size;
     u64 memory_allocate_size;
     u64 memory_malloc_cost;
     u64 memory_free_cost;
-} statistics_t;
+    double external_fragmentation_rate;
+} statistics_t;  
 
 typedef struct {
     statistics_t statistics;
@@ -144,7 +145,14 @@ void test_memory_allocate()
     // call the recursive function to generate all valid sequences and save them
     generateMallocFreeSequence(0, 0, sequence, 0, sequences, &seq_index);
 
+    u64 total_malloc_cost = 0;
+    u64 total_free_cost = 0;
+    u64 total_memory_malloc_size = 0;
+    u64 total_memory_allocate_size = 0;
+    double total_external_fragmentation_rate = 0;
+
     mem_stat_hook_add(memory_hook_malloc, memory_hook_free);
+
     for (int i = 0; i < seq_index; i++) {
         Stack stack;
         init_stack(&stack);
@@ -159,6 +167,8 @@ void test_memory_allocate()
                 if(mem_getinfo(&mem_info) == 0){
                     statistics[statistics_index].statistics.memory_malloc_size = size * sizeof(int);
                     statistics[statistics_index].statistics.memory_allocate_size = mem_info.heapmemused;
+                    int max_free_size = mem_findmax();
+                    statistics[statistics_index].statistics.external_fragmentation_rate = (double)max_free_size / mem_info.totalheapmem;
                 }
                 statistics[statistics_index].statistics.memory_malloc_cost = sys_timestamp();
                 int* ptr = (int*)malloc(size * sizeof(int));
@@ -178,14 +188,30 @@ void test_memory_allocate()
                 statistics[index].ptr = NULL;
             }
         }
+        printf("NO.%d : sequence: %s\n", i, sequence);
         for(int j = 0; j < MALLOC_NUM; j++){
-            printk("NO.%d : statistics[%d].statistics.memory_malloc_size: %d\n", i, j, statistics[j].statistics.memory_malloc_size);
-            printk("NO.%d : statistics[%d].statistics.memory_allocate_size: %d\n", i, j, statistics[j].statistics.memory_allocate_size);
-            printk("NO.%d : statistics[%d].statistics.memory_malloc_cost: %d\n", i, j, statistics[j].statistics.memory_malloc_cost);
-            printk("NO.%d : statistics[%d].statistics.memory_free_cost: %d\n", i, j, statistics[j].statistics.memory_free_cost);
+            printf("malloc %d : memory_malloc_size: %d   ", j, statistics[j].statistics.memory_malloc_size);
+            printf("malloc %d : memory_allocate_size: %d   ", j, statistics[j].statistics.memory_allocate_size);
+            printf("malloc %d : memory_malloc_cost: %d   ", j, statistics[j].statistics.memory_malloc_cost);
+            printf("malloc %d : memory_free_cost: %d    ", j, statistics[j].statistics.memory_free_cost);
+            printf("malloc %d: external_fragmentation_rate: %f %%\n", j, (1-statistics[j].statistics.external_fragmentation_rate)*100);
+            printf("================================================\n");
+            total_malloc_cost += statistics[j].statistics.memory_malloc_cost;
+            total_free_cost += statistics[j].statistics.memory_free_cost;
+            total_memory_malloc_size += statistics[j].statistics.memory_malloc_size;
+            total_memory_allocate_size += statistics[j].statistics.memory_allocate_size;
+            total_external_fragmentation_rate += statistics[j].statistics.external_fragmentation_rate;
         }
     }
+    // printf("total_malloc_cost: %d ns\n", total_malloc_cost);
+    // printf("total_free_cost: %d ns\n", total_free_cost);
+    printf("average_malloc_cost: %f ns\n", ((double)total_malloc_cost / (catalan_number*MALLOC_NUM)) );
+    printf("average_free_cost: %f ns\n", ((double)total_free_cost / (catalan_number*MALLOC_NUM)) );
+    printf("internal_fragmentation_rate: %f %%\n", ((double)(total_memory_allocate_size - total_memory_malloc_size) / total_memory_allocate_size)*100);
+    printf("external_fragmentation_rate: %f %%\n", (1 - (double)(total_external_fragmentation_rate / (catalan_number*MALLOC_NUM)))*100);
     mem_stat_hook_delete();
+    printf("================================================\n");
+    mem_show();
     for(int i = 0; i < seq_index; i++){
         free(sequences[i]);
     }
