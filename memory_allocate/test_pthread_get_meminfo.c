@@ -1,13 +1,14 @@
 #include "../testing.h"
 #include <memory.h>
 #include <memory_show.h>
-/*
-Memory Allocation Metric
-    1. internal fragmentation rate
-    2. external fragmentation rate
-    3. time cost of allocation and deallocation
-    4. max available memory block size
-*/
+// ret = pthread_get_meminfo(pthread_self(), task_meminfo);
+// struct pthread_meminfo
+// {
+//        u32 sigma_alloc_size; 
+//        u32 alloc_cnt; 
+//        u32 sigma_free_size; 
+//        u32 free_cnt; 
+// };
 #define HIGH_PRIORITY 120
 
 int ret;
@@ -39,14 +40,7 @@ void* task(void* arg){
 
 void test_pthread_get_meminfo()
 {
-// ret = pthread_get_meminfo(pthread_self(), task_meminfo);
-// struct pthread_meminfo
-// {
-//        u32 sigma_alloc_size; 
-//        u32 alloc_cnt; 
-//        u32 sigma_free_size; 
-//        u32 free_cnt; 
-// };
+
     pthread_t task_thread;
     struct pthread_meminfo task_meminfo;
     memset(&task_meminfo, 0, sizeof(struct pthread_meminfo));
